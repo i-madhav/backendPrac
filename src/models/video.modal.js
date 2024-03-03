@@ -2,10 +2,9 @@ import mongoose from "mongoose";
 import mongooseAggregatePaginate from "mongoose-aggregate-paginate-v2";
 
 
-
 const videoSchema = new mongoose.Schema({
     videofile:{
-        type:String,
+        type:String, //cloudnary upload
         required:true
     },
     thumbnail:{
@@ -23,7 +22,7 @@ const videoSchema = new mongoose.Schema({
         required:true
     },
     duration:{
-        type:Number,
+        type:Number, //will retrive from cloudnary 
         required:true
     },
     views:{
