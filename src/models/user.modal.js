@@ -40,7 +40,7 @@ const userSchema = new mongoose.Schema({
         ref:"Video"
     },
     refreshToken:{
-        type:true
+        type:String
     }
 } , {timestamps:true});
 
@@ -53,7 +53,7 @@ middleware : whatever user kuch bhi karna cha rha hai ussse just phele hum kuch 
 
 userSchema.pre("save" , async function(next) { 
     if(!this.isModified("password")) return next(); // if the password has NOT been changed
-    this.password = bcrypt.hash(this.password , 10);
+    this.password = await bcrypt.hash(this.password , 10);
     next();
 })
 
