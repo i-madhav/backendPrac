@@ -21,6 +21,6 @@ import userRouter from "./routes/user.routes.js";
 // route declaration
 // router ko lane kei liye middleware lana padega 
 app.use("/api/v1/users" , userRouter)
-
+    
 //http://localhost:8000/api/v1/users/register
 export {app};

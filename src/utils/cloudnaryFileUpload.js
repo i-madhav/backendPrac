@@ -26,8 +26,6 @@ const uploadOnCloudnary = async (localFilePath) => {
     }
 }*/
 
-export {uploadOnCloudnary}
-
 import { v2 as cloudinary } from "cloudinary";
 import { log } from "console";
 import exp from "constants";
@@ -45,8 +43,8 @@ const uploadOnCloudnary = async (localFilePath) => {
         const response = await cloudinary.uploader.upload(localFilePath , {
             resource_type:"auto"
         })
-
         console.log("Successful" , response.url);
+        fs.unlinkSync(localFilePath);
         return response;
     }catch(error){
         console.error("Couldn't upload the file to cloudninary" , error.message);
@@ -55,4 +53,4 @@ const uploadOnCloudnary = async (localFilePath) => {
     }
 }
 
-export {uploadOnCloudnary};
+export {uploadOnCloudnary}
