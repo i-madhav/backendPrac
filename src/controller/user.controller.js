@@ -4,6 +4,22 @@ import { User } from "../models/user.modal.js";
 import { uploadOnCloudnary } from "../utils/cloudnaryFileUpload.js"
 import { ApiResponse } from "../utils/apiresponse.js";
 
+const generateAccessTokenAndRefreshToken = async(userId) =>{
+  try {
+    const user = User.findById(userId);
+
+    const accessToken = user.generateAccessToken();
+    const refreshToken = user.generateRefresshToken();
+
+    user.refreshToken = refreshToken;
+    await user.save({ValidateBeforeSave:false});
+
+    return {accessToken , refreshToken}
+
+  } catch (error) {
+    throw new ApiError(500 ,"Could not generate referesh token and access token");
+  }
+}
 const registerUser = asyncHandler(async (req, res) => {
   // get user details from the frontend
   //validation : if not empty
@@ -70,4 +86,33 @@ const registerUser = asyncHandler(async (req, res) => {
 
 })
 
-export { registerUser }
+const loginUser = asyncHandler(async(req , res) =>{
+  // get detail : email and password
+  // check if user exist karta of email and validate the password
+  // check user not exist error show and kahuga register first
+  // access token deduga
+  //refereh token
+  //send cookie
+
+  const {username , email , password} = req.body;
+  if(!username || !email) throw new ApiError(400 , "username or password is required");
+
+  const user = await User.findOne({
+    $or:[{email} , {username}]
+  })
+
+  if (!user) throw new ApiError(400 , "User or email doesn't exist");
+
+  const isPasswordValid =  await user.isPassword(password);
+
+  if(!isPasswordValid) throw new ApiError(401, "Password invalid");
+
+  const {accessToken ,refreshToken} = await generateAccessTokenAndRefreshToken(user._id); // yaha is operation mai time lag sakta hai !
+
+  const loggedInUser = User.findById(user._id)
+  .select("-password -refreshToken") // these are the fields i dont't want
+
+  
+});
+
+export {registerUser , loginUser}
