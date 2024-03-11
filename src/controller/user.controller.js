@@ -4,7 +4,7 @@ import { User } from "../models/user.modal.js";
 import { uploadOnCloudnary } from "../utils/cloudnaryFileUpload.js"
 import { ApiResponse } from "../utils/apiresponse.js";
 
-const generateAccessTokenAndRefreshToken = async(userId) =>{
+const generateAccessTokenAndRefreshToken = async (userId) => {
   try {
     const user = User.findById(userId);
 
@@ -12,12 +12,12 @@ const generateAccessTokenAndRefreshToken = async(userId) =>{
     const refreshToken = user.generateRefresshToken();
 
     user.refreshToken = refreshToken;
-    await user.save({ValidateBeforeSave:false});
+    await user.save({ ValidateBeforeSave: false });
 
-    return {accessToken , refreshToken}
+    return { accessToken, refreshToken }
 
   } catch (error) {
-    throw new ApiError(500 ,"Could not generate referesh token and access token");
+    throw new ApiError(500, "Could not generate referesh token and access token");
   }
 }
 const registerUser = asyncHandler(async (req, res) => {
@@ -52,7 +52,7 @@ const registerUser = asyncHandler(async (req, res) => {
 
   const avatarLocalPath = req.files?.avatar[0]?.path;
   const coverImageLocalPath = req.files?.coverImage[0]?.path;
-  
+
   /*let coverImageLocalPath;
   if (req.files && Array.isArray(req.files.coverImage) && req.file.coverImage.length > 0) {
    coverImageLocalPath =  req.files.coverImage[0].path
@@ -86,7 +86,7 @@ const registerUser = asyncHandler(async (req, res) => {
 
 })
 
-const loginUser = asyncHandler(async(req , res) =>{
+const loginUser = asyncHandler(async (req, res) => {
   // get detail : email and password
   // check if user exist karta of email and validate the password
   // check user not exist error show and kahuga register first
@@ -94,25 +94,43 @@ const loginUser = asyncHandler(async(req , res) =>{
   //refereh token
   //send cookie
 
-  const {username , email , password} = req.body;
-  if(!username || !email) throw new ApiError(400 , "username or password is required");
+  const { username, email, password } = req.body;
+  if (!username || !email) throw new ApiError(400, "username or email is required");
 
   const user = await User.findOne({
-    $or:[{email} , {username}]
+    $or: [{ email }, { username }]
   })
 
-  if (!user) throw new ApiError(400 , "User or email doesn't exist");
+  if (!user) throw new ApiError(400, "User or email doesn't exist");
 
-  const isPasswordValid =  await user.isPassword(password);
+  const isPasswordValid = await user.isPassword(password);
 
-  if(!isPasswordValid) throw new ApiError(401, "Password invalid");
+  if (!isPasswordValid) throw new ApiError(401, "Password invalid");
 
-  const {accessToken ,refreshToken} = await generateAccessTokenAndRefreshToken(user._id); // yaha is operation mai time lag sakta hai !
+  const { accessToken, refreshToken } = await generateAccessTokenAndRefreshToken(user._id); // yaha is operation mai time lag sakta hai !
 
-  const loggedInUser = User.findById(user._id)
-  .select("-password -refreshToken") // these are the fields i dont't want
+  const loggedInUser = await User.findById(user._id)
+    .select("-password -refreshToken") // these are the fields i dont't want to send to my client
 
+  const options = { // by doing this your cookies is only modifilable on the server side not frontend side
+    httpOnly: true,
+    secure: true
+  }
+
+  return res.status(200)
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
+    .json(
+      new ApiResponse(200, {
+        user: loggedInUser, accessToken, refreshToken
+      },
+        "user logged in successfully"
+      )
+    )
+})
+
+const logOutUser = asyncHandler(async(req , res) =>{
   
-});
+})
 
-export {registerUser , loginUser}
+export { registerUser, loginUser }
