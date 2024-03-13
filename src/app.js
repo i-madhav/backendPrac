@@ -20,6 +20,7 @@ import userRouter from "./routes/user.routes.js";
 
 // route declaration
 // router ko lane kei liye middleware lana padega 
+//"For any incoming HTTP requests whose path starts with /api/v1/users, delegate the handling of those requests to the userRouter."
 app.use("/api/v1/users" , userRouter)
     
 //http://localhost:8000/api/v1/users/register

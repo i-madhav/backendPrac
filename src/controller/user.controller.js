@@ -6,7 +6,7 @@ import { ApiResponse } from "../utils/apiresponse.js";
 
 const generateAccessTokenAndRefreshToken = async (userId) => {
   try {
-    const user = User.findById(userId);
+    const user = await User.findById(userId);
 
     const accessToken = user.generateAccessToken();
     const refreshToken = user.generateRefresshToken();
@@ -62,6 +62,8 @@ const registerUser = asyncHandler(async (req, res) => {
 
   const avatar = await uploadOnCloudnary(avatarLocalPath);
   const coverImage = await uploadOnCloudnary(coverImageLocalPath);
+  console.log(avatar);
+  console.log(coverImage);
 
   if (!avatar) throw new ApiError(400, "Avatar not available");
 
@@ -95,7 +97,9 @@ const loginUser = asyncHandler(async (req, res) => {
   //send cookie
 
   const { username, email, password } = req.body;
-  if (!username || !email) throw new ApiError(400, "username or email is required");
+  console.log(email);
+  console.log(username);
+  if (!username && !email) throw new ApiError(400, "username or email is required");
 
   const user = await User.findOne({
     $or: [{ email }, { username }]
@@ -103,12 +107,11 @@ const loginUser = asyncHandler(async (req, res) => {
 
   if (!user) throw new ApiError(400, "User or email doesn't exist");
 
-  const isPasswordValid = await user.isPassword(password);
+  const isPasswordValid = await user.isPasswordValid(password);
 
   if (!isPasswordValid) throw new ApiError(401, "Password invalid");
 
   const { accessToken, refreshToken } = await generateAccessTokenAndRefreshToken(user._id); // yaha is operation mai time lag sakta hai !
-
   const loggedInUser = await User.findById(user._id)
     .select("-password -refreshToken") // these are the fields i dont't want to send to my client
 
@@ -129,8 +132,30 @@ const loginUser = asyncHandler(async (req, res) => {
     )
 })
 
-const logOutUser = asyncHandler(async(req , res) =>{
-  
+const logOutUser = asyncHandler(async (req, res) => {
+  await User.findByIdAndUpdate(
+    req.user._id,
+    {
+      $set: {
+        refreshToken: undefined
+      }
+    },
+    {
+      new: true // this will make sure i have updated field in response
+    }
+  )
+
+
+  const options = { // by doing this your cookies is only modifilable on the server side not frontend side
+    httpOnly: true,
+    secure: true
+  }
+
+  return res.status(200)
+    .clearCookie("accessToken", options)
+    .clearCookie("refreshToken", options)
+    .json(new ApiResponse(200, {}, "User loggedOut"))
+
 })
 
-export { registerUser, loginUser }
+export { registerUser, loginUser, logOutUser }
