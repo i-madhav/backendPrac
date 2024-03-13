@@ -3,6 +3,7 @@ import { ApiError } from "../utils/apiError.js";
 import { User } from "../models/user.modal.js";
 import { uploadOnCloudnary } from "../utils/cloudnaryFileUpload.js"
 import { ApiResponse } from "../utils/apiresponse.js";
+import jwt from "jsonwebtoken";
 
 const generateAccessTokenAndRefreshToken = async (userId) => {
   try {
@@ -158,4 +159,42 @@ const logOutUser = asyncHandler(async (req, res) => {
 
 })
 
-export { registerUser, loginUser, logOutUser }
+const refreshAccessToken = asyncHandler(async (req, res) => {
+  
+try {
+    const inComingRefreshToken = req.cookies?.refreshToken || req.body.refreshToken;
+    if (!inComingRefreshToken) throw new ApiError(401, "Unauthorized request");
+  
+    const decodedToken = jwt.verify(inComingRefreshToken, process.env.REFRESH_TOKEN_SECRET);
+  
+    const user = await User.findById(decodedToken?._id);
+    if (!user) throw new ApiError(401, "Invalid refresh Token");
+  
+    if (inComingRefreshToken !== user?.refreshToken) {
+      throw new ApiError(401, "Refresh token expired")
+    }
+  
+    const options = { // by doing this your cookies is only modifilable on the server side not frontend side
+      httpOnly: true,
+      secure: true
+    }
+  
+    const { accessToken, newrefreshToken } = await generateAccessTokenAndRefreshToken(user._id)
+  
+    return res
+      .status(200)
+      .cookie("accessToken", accessToken, options)
+      .cookie("refreshToken", newrefreshToken, options)
+      .json(
+        new ApiResponse(200,
+          { accessToken, refreshToken: newrefreshToken },
+          "AccessToken Refreshed successfully"
+        )
+      )
+  
+} catch (error) {
+  throw new ApiError(401 , error?.message || "Invalid token")
+}
+})
+
+export { registerUser, loginUser, logOutUser ,refreshAccessToken}
