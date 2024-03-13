@@ -21,6 +21,7 @@ const generateAccessTokenAndRefreshToken = async (userId) => {
     throw new ApiError(500, "Could not generate referesh token and access token");
   }
 }
+
 const registerUser = asyncHandler(async (req, res) => {
   // get user details from the frontend
   //validation : if not empty
@@ -196,5 +197,21 @@ try {
   throw new ApiError(401 , error?.message || "Invalid token")
 }
 })
+
+const changeCurrentUserPassword = asyncHandler(async(req , res) => {
+  const{oldPassword , newPassword} = req.body;
+  const user = await User.findById(req.user?._id)
+
+ const isPasswordCorrect =  await user.isPasswordValid(oldPassword);
+ if(!isPasswordCorrect) throw new ApiError(400 , "Invalid password");
+
+ user.password = newPassword;
+ await user.save({ValidateBeforeSave:false});
+
+ return res
+ .status(200)
+ .json(new ApiResponse(200 , {} , "Password Changes Successfully"))
+ 
+});
 
 export { registerUser, loginUser, logOutUser ,refreshAccessToken}
