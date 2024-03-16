@@ -135,6 +135,7 @@ const loginUser = asyncHandler(async (req, res) => {
 })
 
 const logOutUser = asyncHandler(async (req, res) => {
+  console.log(req.user);
   await User.findByIdAndUpdate(
     req.user._id,
     {
@@ -161,27 +162,27 @@ const logOutUser = asyncHandler(async (req, res) => {
 })
 
 const refreshAccessToken = asyncHandler(async (req, res) => {
-  
-try {
+
+  try {
     const inComingRefreshToken = req.cookies?.refreshToken || req.body.refreshToken;
     if (!inComingRefreshToken) throw new ApiError(401, "Unauthorized request");
-  
+
     const decodedToken = jwt.verify(inComingRefreshToken, process.env.REFRESH_TOKEN_SECRET);
-  
+
     const user = await User.findById(decodedToken?._id);
     if (!user) throw new ApiError(401, "Invalid refresh Token");
-  
+
     if (inComingRefreshToken !== user?.refreshToken) {
       throw new ApiError(401, "Refresh token expired")
     }
-  
+
     const options = { // by doing this your cookies is only modifilable on the server side not frontend side
       httpOnly: true,
       secure: true
     }
-  
+
     const { accessToken, newrefreshToken } = await generateAccessTokenAndRefreshToken(user._id)
-  
+
     return res
       .status(200)
       .cookie("accessToken", accessToken, options)
@@ -192,32 +193,89 @@ try {
           "AccessToken Refreshed successfully"
         )
       )
-  
-} catch (error) {
-  throw new ApiError(401 , error?.message || "Invalid token")
-}
+
+  } catch (error) {
+    throw new ApiError(401, error?.message || "Invalid token")
+  }
 })
 
-const changeCurrentUserPassword = asyncHandler(async(req , res) => {
-  const{oldPassword , newPassword} = req.body;
+const changeCurrentUserPassword = asyncHandler(async (req, res) => {
+  const { oldPassword, newPassword } = req.body;
   const user = await User.findById(req.user?._id)
 
- const isPasswordCorrect =  await user.isPasswordValid(oldPassword);
- if(!isPasswordCorrect) throw new ApiError(400 , "Invalid password");
+  const isPasswordCorrect = await user.isPasswordValid(oldPassword);
+  if (!isPasswordCorrect) throw new ApiError(400, "Invalid password");
 
- user.password = newPassword;
- await user.save({ValidateBeforeSave:false});
+  user.password = newPassword;
+  await user.save({ ValidateBeforeSave: false });
 
- return res
- .status(200)
- .json(new ApiResponse(200 , {} , "Password Changes Successfully"))
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Password Changes Successfully"))
 
 });
 
-const getCurrentUser = asyncHandler(async(req , res) =>{
+const getCurrentUser = asyncHandler(async (req, res) => {
   return res
-        .status(200)
-        .json(200 , req.user , "currentUser Fetched Successfully")
+    .status(200)
+    .json(200, req.user, "currentUser Fetched Successfully")
 })
 
-export { registerUser, loginUser, logOutUser ,refreshAccessToken , changeCurrentUserPassword , getCurrentUser}
+const updateUser = asyncHandler(async (req, res) => {
+  const { fullName, email } = req.body;
+  if (!(fullName || email)) throw new ApiError(400, "Fields are empty");
+
+  const user = await User.findByIdAndUpdate(req.user._id, {
+    $set: {
+      fullName,
+      email
+    },
+  },
+    {
+      new: true
+    }
+  )
+
+  res
+    .status(200)
+    .json(new ApiResponse(200, user, "Email and fullname updated successfully :)"))
+})
+
+const getUserChannelProfile = asyncHandler(async (req, res) => {
+  const { username } = req.param;
+  if (!username?.trim()) throw new ApiError(400, "username not found");
+
+  // aggregate karne kei baad value jo atti hai hai vo array mai atti hai.
+  const channel = await User.aggregate([
+    {
+      $match: {
+        username: username?.toLowerCase()
+      }
+    },
+    {
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "channel",
+        as: "subscribers"
+      }
+    },
+    {
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "subscriber",
+        as: "subscribedTo"
+      }
+    },
+    {
+      $addFields:{
+        subscriberCount:{
+          $size:{}
+        }
+      }
+    }
+  ])
+})
+
+export { registerUser, loginUser, logOutUser, refreshAccessToken, changeCurrentUserPassword, getCurrentUser, updateUser, getUserChannelProfile }
