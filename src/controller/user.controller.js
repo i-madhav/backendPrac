@@ -4,6 +4,7 @@ import { User } from "../models/user.modal.js";
 import { uploadOnCloudnary } from "../utils/cloudnaryFileUpload.js"
 import { ApiResponse } from "../utils/apiresponse.js";
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 
 const generateAccessTokenAndRefreshToken = async (userId) => {
   try {
@@ -139,8 +140,8 @@ const logOutUser = asyncHandler(async (req, res) => {
   await User.findByIdAndUpdate(
     req.user._id,
     {
-      $set: {
-        refreshToken: undefined
+      $unset: {
+        refreshToken: 1
       }
     },
     {
@@ -243,9 +244,8 @@ const updateUser = asyncHandler(async (req, res) => {
 
 const getUserChannelProfile = asyncHandler(async (req, res) => {
   const { username } = req.param;
-  if (!username?.trim()) throw new ApiError(400, "username not found");
+  if (!username?.trim()) throw new ApiError(400, "channel not found");
 
-  // aggregate karne kei baad value jo atti hai hai vo array mai atti hai.
   const channel = await User.aggregate([
     {
       $match: {
@@ -262,20 +262,100 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
     },
     {
       $lookup: {
-        from: "subscriptions",
+        from: "subscription",
         localField: "_id",
         foreignField: "subscriber",
         as: "subscribedTo"
       }
     },
     {
-      $addFields:{
-        subscriberCount:{
-          $size:{}
+      $addFields: {
+        subscriberCount: {
+          $size: "$subscribers" // used to count number of doc with $subscribe field . 
+        },
+        channelsSubscribedToCount: {
+          $size: "subscribedTo"
+        },
+        isSubscribed: {
+          $cond: {
+            if: { $in: [req.user?._id, "$subscribers.subscriber"] }, // can see in both arr , object
+            then: true,
+            else: false
+          }
         }
+      }
+    },
+    {
+      $project: { // will send this data to the frontend
+        fullName: 1,
+        email: 1,
+        username: 1,
+        subscriberCount: 1,
+        channelsSubscribedToCount: 1,
+        isSubscribed: 1,
+        avatar: 1,
+        coverImage: 1
       }
     }
   ])
+  console.log(channel);
+
+  if (!channel?.length) throw new ApiError(404, "channel doesn't exist");
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, channel[0], "User channel information fetched"));
 })
 
-export { registerUser, loginUser, logOutUser, refreshAccessToken, changeCurrentUserPassword, getCurrentUser, updateUser, getUserChannelProfile }
+const watchHistory = asyncHandler(async (req, res) => {
+  // while using pipeline mongoose is not working we directly interacting with the database
+  const user = await User.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(req.user?._id) // we get a string so we have to convert it into mongoose id
+      }
+    },
+    {
+      $lookup: {
+        from: "videos",
+        localField: "watchHistory",
+        foreignField: "_id",
+        as: "watchHistory",
+
+        pipeline: [
+          {
+            $lookup: {
+              from: "users",
+              localField: "owner",
+              foreignField: "_id",
+              as: "owner",
+              pipeline:[
+                {
+                  $project:{
+                    // jitna bhi project karuga vo meri owner field mai hi chalajega
+                    fullname:1,
+                    username:1,
+                    avatar:1,
+                  }
+                }
+              ]
+            }
+          },
+          {
+            $addFields:{
+            owner:{
+              $first:"$owner"
+            }
+          }
+          }
+        ]
+      }
+    }
+  ])
+
+  return res
+  .status(200)
+  .json(new ApiResponse(200 , user[0].watchHistory , "watch history fetched"))
+})
+
+export { registerUser, loginUser, logOutUser, refreshAccessToken, changeCurrentUserPassword, getCurrentUser, updateUser, getUserChannelProfile, watchHistory}
